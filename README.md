@@ -7,3 +7,9 @@ THIS WORK IS PROVIDED "AS IS", WITHOUT ANY EXPRESS OR IMPLIED EXTRAS.
 
 yes it is!
 ...
+
+## REFERENCES
+
+https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/pwa/turn-your-website-pwa
+
+
