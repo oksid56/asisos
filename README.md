@@ -12,4 +12,6 @@ yes it is!
 
 https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/pwa/turn-your-website-pwa
 
+https://developer.chrome.com/blog/getting-started-pwa
+
 
