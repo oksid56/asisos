@@ -26,6 +26,8 @@
     <div class="center">PWA Text Editor</div>
     <div class="right">
       <button id="installBtn" style="display:none">Install</button>
+      <!-- New filename display -->
+      <span id="filename" class="filename" title="Opened filename">untitled.txt</span>
       <span id="status" class="status">Saved</span>
     </div>
   </header>
@@ -50,6 +52,7 @@
   (function () {
     const editor = document.getElementById('editor');
     const status = document.getElementById('status');
+    const filenameSpan = document.getElementById('filename');
     const autosaveCheckbox = document.getElementById('autosave');
     const downloadBtn = document.getElementById('downloadBtn');
     const openBtn = document.getElementById('openBtn');
@@ -59,19 +62,24 @@
     const installBtn = document.getElementById('installBtn');
 
     const STORAGE_KEY = 'pwa-editor-content-v1';
+    const NAME_KEY = STORAGE_KEY + '-name';
     let saveTimeout = null;
     let deferredPrompt = null;
+    let currentFilename = localStorage.getItem(NAME_KEY) || 'untitled.txt';
 
     // load content
     const load = () => {
       const content = localStorage.getItem(STORAGE_KEY) || '';
       editor.value = content;
+      currentFilename = localStorage.getItem(NAME_KEY) || 'untitled.txt';
+      filenameSpan.textContent = currentFilename;
       showStatus('Loaded');
     };
 
     // save content
     const save = (show = true) => {
       localStorage.setItem(STORAGE_KEY, editor.value);
+      localStorage.setItem(NAME_KEY, currentFilename);
       if (show) showStatus('Saved');
     };
 
@@ -84,70 +92,75 @@
     // autosave on typing (debounced)
     editor.addEventListener('input', () => {
       if (autosaveCheckbox.checked) {
-        clearTimeout(saveTimeout);
-        saveTimeout = setTimeout(() => save(false), 800);
-        status.textContent = 'Editing...';
+        if (saveTimeout) clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => save(true), 600);
       } else {
-        status.textContent = 'Unsaved';
+        showStatus('Unsaved');
       }
     });
 
-    // manual save / open shortcuts
-    document.addEventListener('keydown', (e) => {
-      const mod = (navigator.platform && navigator.platform.includes && navigator.platform.includes('Mac')) ? e.metaKey : e.ctrlKey;
-      if (mod && e.key && e.key.toLowerCase() === 's') {
+    // New file
+    newBtn.addEventListener('click', () => {
+      editor.value = '';
+      currentFilename = 'untitled.txt';
+      filenameSpan.textContent = currentFilename;
+      save(true);
+    });
+
+    // Clear (keeps filename)
+    clearBtn.addEventListener('click', () => {
+      editor.value = '';
+      save(true);
+    });
+
+    // Open (trigger file input)
+    openBtn.addEventListener('click', () => fileInput.click());
+
+    // File input change -> read file and set filename
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        editor.value = String(reader.result);
+        currentFilename = file.name || 'untitled.txt';
+        filenameSpan.textContent = currentFilename;
+        save(true);
+        // clear file input so same file can be re-selected later
+        fileInput.value = '';
+      };
+      reader.onerror = () => showStatus('Error opening file');
+      reader.readAsText(file);
+    });
+
+    // Download current content using currentFilename
+    downloadBtn.addEventListener('click', () => {
+      const content = editor.value || '';
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = currentFilename || 'download.txt';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      showStatus('Downloaded');
+    });
+
+    // Keyboard shortcuts: Save (Ctrl/Cmd+S) and Open (Ctrl/Cmd+O)
+    window.addEventListener('keydown', (e) => {
+      const key = (e.key || '').toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && key === 's') {
         e.preventDefault();
-        save();
-      }
-      if (mod && e.key && e.key.toLowerCase() === 'o') {
+        save(true);
+      } else if ((e.ctrlKey || e.metaKey) && key === 'o') {
         e.preventDefault();
         fileInput.click();
       }
     });
 
-    // download/export
-    downloadBtn.addEventListener('click', () => {
-      const blob = new Blob([editor.value], { type: 'text/plain;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.download = 'note.txt';
-      a.href = url;
-      a.click();
-      URL.revokeObjectURL(url);
-      showStatus('Downloaded');
-    });
-
-    // open/import
-    openBtn.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', async (e) => {
-      const f = e.target.files && e.target.files[0];
-      if (!f) return;
-      try {
-        const text = await f.text();
-        editor.value = text;
-        save();
-        fileInput.value = '';
-        showStatus('Opened');
-      } catch (err) {
-        console.error('Failed to read file', err);
-        showStatus('Open failed');
-      }
-    });
-
-    newBtn.addEventListener('click', () => {
-      if (editor.value.trim().length && !confirm('Discard current content and start new?')) return;
-      editor.value = '';
-      save();
-    });
-
-    clearBtn.addEventListener('click', () => {
-      if (!confirm('Clear saved content permanently?')) return;
-      editor.value = '';
-      localStorage.removeItem(STORAGE_KEY);
-      showStatus('Cleared');
-    });
-
-    // install prompt handling
+    // Install prompt handling (if present elsewhere in your PWA code)
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       deferredPrompt = e;
@@ -156,26 +169,23 @@
     installBtn.addEventListener('click', async () => {
       if (!deferredPrompt) return;
       deferredPrompt.prompt();
-      try {
-        const choice = await deferredPrompt.userChoice;
-        deferredPrompt = null;
-        installBtn.style.display = 'none';
-        showStatus(choice && choice.outcome === 'accepted' ? 'Installed' : 'Install dismissed');
-      } catch (err) {
-        deferredPrompt = null;
-        installBtn.style.display = 'none';
-      }
+      const choice = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      installBtn.style.display = 'none';
+      showStatus(choice.outcome === 'accepted' ? 'Installed' : 'Install dismissed');
     });
 
-    // register service worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js')
-        .then(() => console.log('Service worker registered'))
-        .catch((err) => console.warn('SW register failed', err));
-    }
-
-    // initial load
+    // Initial load
     load();
+
+    // Optional: register service worker if you have one (uncomment if needed)
+    /*
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js').catch(() => {
+        console.warn('Service worker registration failed');
+      });
+    }
+    */
   })();
   </script>
 </body>
