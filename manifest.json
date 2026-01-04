@@ -1,0 +1,25 @@
+{
+  "name": "PWA Text Editor",
+  "short_name": "Editor",
+  "description": "Minimal offline-capable progressive web app text editor",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2b2b2b",
+  "license": "CC0-1.0",
+  "license_url": "./LICENSE",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    }
+  ]
+}

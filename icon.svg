@@ -1,0 +1,12 @@
+<!--
+  pwa-editor/icons/icon.svg
+  CC0 1.0 Universal - https://creativecommons.org/publicdomain/zero/1.0/
+  SPDX-License-Identifier: CC0-1.0
+  See ../LICENSE for the full legal text.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="2" y="3" width="20" height="18" rx="2" ry="2" fill="#2b2b2b"/>
+  <path d="M8 7h8" stroke="#4fc3f7"/>
+  <path d="M8 11h8" stroke="#cbeffd"/>
+  <path d="M8 15h5" stroke="#9fe6ff"/>
+</svg>

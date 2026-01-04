@@ -1,0 +1,188 @@
+<!--
+  pwa-editor/index.html
+  CC0 1.0 Universal - https://creativecommons.org/publicdomain/zero/1.0/
+  SPDX-License-Identifier: CC0-1.0
+  See ./LICENSE for the full legal text.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#2b2b2b"/>
+  <meta name="license" content="CC0-1.0">
+  <link rel="license" href="./LICENSE">
+  <title>PWA Text Editor</title>
+
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css">
+
+  <meta name="description" content="Simple offline-capable PWA text editor (standalone).">
+</head>
+<body>
+  <header class="bar">
+    <div class="left">
+      <button id="newBtn" title="New">New</button>
+      <button id="openBtn" title="Open">Open</button>
+      <input id="fileInput" type="file" accept=".txt,text/plain" style="display:none">
+      <button id="downloadBtn" title="Download">Download</button>
+      <button id="clearBtn" title="Clear">Clear</button>
+    </div>
+    <div class="center">PWA Text Editor</div>
+    <div class="right">
+      <button id="installBtn" style="display:none">Install</button>
+      <span id="status" class="status">Saved</span>
+    </div>
+  </header>
+
+  <main>
+    <textarea id="editor" placeholder="Start typing..."></textarea>
+  </main>
+
+  <footer class="bar small">
+    <label><input id="autosave" type="checkbox" checked> Autosave</label>
+    <span class="spacer"></span>
+    <small>Shortcuts: <strong>Ctrl/Cmd+S</strong> save · <strong>Ctrl/Cmd+O</strong> open</small>
+  </footer>
+
+  <script>
+  /*
+    pwa-editor/index.html (embedded JS)
+    CC0 1.0 Universal - https://creativecommons.org/publicdomain/zero/1.0/
+    SPDX-License-Identifier: CC0-1.0
+    See ../LICENSE for the full legal text.
+  */
+  (function () {
+    const editor = document.getElementById('editor');
+    const status = document.getElementById('status');
+    const autosaveCheckbox = document.getElementById('autosave');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const openBtn = document.getElementById('openBtn');
+    const fileInput = document.getElementById('fileInput');
+    const newBtn = document.getElementById('newBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const installBtn = document.getElementById('installBtn');
+
+    const STORAGE_KEY = 'pwa-editor-content-v1';
+    let saveTimeout = null;
+    let deferredPrompt = null;
+
+    // load content
+    const load = () => {
+      const content = localStorage.getItem(STORAGE_KEY) || '';
+      editor.value = content;
+      showStatus('Loaded');
+    };
+
+    // save content
+    const save = (show = true) => {
+      localStorage.setItem(STORAGE_KEY, editor.value);
+      if (show) showStatus('Saved');
+    };
+
+    const showStatus = (text) => {
+      status.textContent = text;
+      status.classList.add('flash');
+      setTimeout(() => status.classList.remove('flash'), 700);
+    };
+
+    // autosave on typing (debounced)
+    editor.addEventListener('input', () => {
+      if (autosaveCheckbox.checked) {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(() => save(false), 800);
+        status.textContent = 'Editing...';
+      } else {
+        status.textContent = 'Unsaved';
+      }
+    });
+
+    // manual save / open shortcuts
+    document.addEventListener('keydown', (e) => {
+      const mod = (navigator.platform && navigator.platform.includes && navigator.platform.includes('Mac')) ? e.metaKey : e.ctrlKey;
+      if (mod && e.key && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        save();
+      }
+      if (mod && e.key && e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        fileInput.click();
+      }
+    });
+
+    // download/export
+    downloadBtn.addEventListener('click', () => {
+      const blob = new Blob([editor.value], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.download = 'note.txt';
+      a.href = url;
+      a.click();
+      URL.revokeObjectURL(url);
+      showStatus('Downloaded');
+    });
+
+    // open/import
+    openBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', async (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      try {
+        const text = await f.text();
+        editor.value = text;
+        save();
+        fileInput.value = '';
+        showStatus('Opened');
+      } catch (err) {
+        console.error('Failed to read file', err);
+        showStatus('Open failed');
+      }
+    });
+
+    newBtn.addEventListener('click', () => {
+      if (editor.value.trim().length && !confirm('Discard current content and start new?')) return;
+      editor.value = '';
+      save();
+    });
+
+    clearBtn.addEventListener('click', () => {
+      if (!confirm('Clear saved content permanently?')) return;
+      editor.value = '';
+      localStorage.removeItem(STORAGE_KEY);
+      showStatus('Cleared');
+    });
+
+    // install prompt handling
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      installBtn.style.display = 'inline-block';
+    });
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      try {
+        const choice = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        installBtn.style.display = 'none';
+        showStatus(choice && choice.outcome === 'accepted' ? 'Installed' : 'Install dismissed');
+      } catch (err) {
+        deferredPrompt = null;
+        installBtn.style.display = 'none';
+      }
+    });
+
+    // register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./sw.js')
+        .then(() => console.log('Service worker registered'))
+        .catch((err) => console.warn('SW register failed', err));
+    }
+
+    // initial load
+    load();
+  })();
+  </script>
+</body>
+</html>
